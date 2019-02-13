@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <title id="title">osu! music player</title>
+        <meta charset="utf-8">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://assets.ppy.sh https://discordapp.com/api/; img-src 'self' https://assets.ppy.sh; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com">
+        <script src="rpc.js"></script>
+        <script src="renderer.js"></script>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Exo+2">
+        <link rel="stylesheet" href="styles.css"></link>
+    </head>
+    <body>
+        <div class="titlebar">
+            <div class="icon button" id="icon">
+                <img src="osuPlayer.svg" alt="">
+            </div>
+            <div class="title">
+                <span>osu! music player</span>
+            </div>
+            <div class="icon button" id="minimize">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <line x1="0" y1="8" x2="16" y2="8"/>
+                </svg>
+            </div>
+            <div class="icon button" id="maximize">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <path d="M4 4 L4 1 L15 1 L15 12 L12 12"/>
+                    <rect x="1" y="4" width="11" height="11"/>
+                </svg>
+            </div>
+            <div class="icon button" id="close">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <line x1="0" y1="0" x2="16" y2="16"/>
+                    <line x1="16" y1="0" x2="0" y2="16"/>
+                </svg>
+            </div>
+        </div>
+        <div class="mainapp" id="mainapp">
+            <table class="center" id="table">
+                <thead>
+                    <tr>
+                        <th class="osuOnly">ID</th>
+                        <th class="osuOnly">Artist</th>
+                        <th class="osuOnly">Song</th>
+                        <th>File</th>
+                    </tr>
+                </thead>
+            </table>
+            <div class="controls fixed">
+                <audio controls volume="0.9" id="audio"></audio>
+                <button type="button" id='prev'>Previous</button>
+                <button type="button" id='next'>Next</button>
+                <button type="button" id='curr'>Track N/A</button>
+            </div>
+        </div>
+    </body>
+</html>
