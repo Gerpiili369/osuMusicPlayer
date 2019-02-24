@@ -72,9 +72,13 @@ table {
     margin-bottom: 0px;
     text-align: center;
     border-collapse: collapse;
+    fill: #FFF;
 }
 
-table:hover { color: #ccc; }
+table:hover {
+    color: #ccc;
+    fill: #ccc;
+}
 
 tr {
     cursor: pointer;
@@ -83,11 +87,23 @@ tr {
     background-repeat: no-repeat;
 }
 
+.preview {
+    color: #DC4AB0;
+}
+
+.preview:hover {
+    color: #DC4AB0;
+}
+
 tr:hover {
     background-color: #4D4D4D;
     color: #FFF;
+    fill: #FFF;
 }
 
+.dl:hover {
+    fill: #DC4AB0;
+}
 
 th, .titlebar {
     background-color: #222;
@@ -105,7 +121,10 @@ td { padding: 10px; }
 .filename { word-break: break-all; }
 
 .current { background-color: #418; }
-.current, .current .numbers { color: #FFF; }
+.current, .current .numbers {
+    color: #FFF;
+    fill: #FFF;
+}
 .current.expand td { padding-top: 260px }
 
 tr:hover .numbers { color: #FC2; }
@@ -174,6 +193,7 @@ audio::-webkit-media-controls-time-remaining-display {
 #next { color: #DC4AB0; }
 #prev { color: #0DA0F5; }
 #curr { color: #943FF5; }
+#more { color: #FC2; }
 #minimize:hover { background-color: #0DA0F5; }
 #maximize:hover { background-color: #93DB07; }
 #close:hover { background-color: #DC4AB0; }

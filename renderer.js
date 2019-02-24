@@ -20,12 +20,74 @@ document.onreadystatechange = () => {
     }
 }
 
+class Song {
+    constructor(src, osu) {
+        const type = (osu ? 'osu!' : '') + typeof src;
+        switch (type) {
+            case 'object':
+                this.url = src.url;
+                this.id = null;
+                this.artist = src.artist || '';
+                this.song =  src.title || '';
+                this.file = src.url.join('').split('\\').help.pop();
+                break;
+            case 'string':
+                this.url = src;
+                this.id = null;
+                this.artist =
+                this.song = '';
+                this.file = src.join('').split('\\').help.pop();
+                break;
+            case 'osu!object':
+                if (src.dir) {
+                    this.url = path.join(src.dir, src.subdir, src.item);
+                    this.file = src.item;
+                    this.id = '';
+
+                    let help = src.subdir;
+                    // Get numbers for ID from the string.
+                    for (const num of help) {
+                        if ('0123456789'.indexOf(num) < 0) break;
+                        this.id += num;
+                    }
+                    // Remove collected ID from the string.
+                    help = help.substring(this.id.length);
+                    // Remove empty space from the beginning.
+                    if (help[0] == ' ') help = help.replace(' ', '')
+                    if (help[0] == '_') help = help.replace('_', '');
+                    // Extract artist and song name from the rest of the string.
+                    // They should be separated by " - ".
+                    help = help.split(' - ');
+                    this.artist = help.shift();
+                    this.song = help.join(' - ');
+                    // Underscore double check.
+                    if (!this.song) {
+                        help = this.artist.split('_-_');
+                        this.artist = help.shift();
+                        this.song = help.join('_-_');
+                    }
+
+                } else {
+                    this.url = 'https:' + src.preview_url;
+                    this.id = src.id;
+                    this.artist = src.artist;
+                    this.song =  src.title;
+                    this.file = `https://osu.ppy.sh/beatmapsets/${ this.id }/download`;
+                    this.isPreview = true;
+                }
+                this.isOsu = true;
+                break;
+            default:
+                throw new Error('Song creation failed.');
+        }
+    }
+}
+
 class Player extends Emitter {
     constructor(element) {
         super();
         this.audioInit(element);
         this.songRoot = path.join(app.getPath('home'), 'AppData', 'Local', 'osu!', 'Songs');
-        this.isOsu = true;
     }
 
     audioInit(element) {
@@ -43,26 +105,53 @@ class Player extends Emitter {
     load() {
         const tasks = [];
         this.list = [];
-        this.isOsu = this.songRoot.indexOf(path.join('osu!', 'Songs')) == this.songRoot.length - 10;
+        this.maps = [];
         tasks.push(this.readDir(this.songRoot));
-        Promise.all(tasks).then(() => this.emit('ready')).catch(err => this.emit('error', err));
+        Promise.all(tasks).then(() => this.emit('songListUpdate')).catch(err => this.emit('error', err));
     }
 
-    readDir(dir) {
-        const player = this
-        return new Promise((resolve, reject) => fs.readdir(dir, (err, res) => {
+    readDir(dir, subdir) {
+        const
+            player = this,
+            isOsu = dir.indexOf(path.join('osu!', 'Songs')) > -1,
+            folder = subdir ? path.join(dir, subdir) : dir;
+            
+        return new Promise((resolve, reject) => fs.readdir(folder, (err, res) => {
             const subPromList = [];
             if (err) reject(err);
             else for (const item of res) switch (item.substring(item.length - item.split('').reverse().join('').indexOf('.') - 1).toLowerCase()) {
                 case '':
-                    subPromList.push(player.readDir(path.join(dir, item)));
+                    if (!isOsu || !subdir) subPromList.push(player.readDir(folder, item));
                     break;
                 case '.mp3':
-                    player.list.push(path.join(dir, item).substring(player.songRoot.length + 1));
+                    const song = new Song({ dir, subdir, item }, isOsu);
+                    player.list.push(song);
+                    if (song.isOsu && song.id) player.maps.push(song.id);
                     break;
             }
-            Promise.all(subPromList).then(resolve);
+            Promise.all(subPromList).then(list => {
+                player.emit('songListUpdate');
+                resolve(list);
+            });
         }));
+    }
+
+    more() {
+        const player = this;
+        let url = 'https://osu.ppy.sh/beatmapsets/search';
+        if (player.cursor) url += `?cursor%5Bapproved_date%5D=${ player.cursor.date }&cursor%5B_id%5D=${ player.cursor.id }`;
+        return new Promise((resolve, reject) => fetch(url).then(res => res.json()).then(data => {
+            if (data.error) reject(error);
+            else {
+                for (const item of data.beatmapsets) if (player.maps.indexOf(item.id) < 0) player.list.push(new Song(item, true));
+                player.cursor = {
+                    date: data.cursor.approved_date,
+                    id: data.cursor._id,
+                }
+                player.emit('songListUpdate');
+                resolve();
+            }
+        }).catch(reject));
     }
 
     shuffle() {
@@ -75,7 +164,7 @@ class Player extends Emitter {
             this.list[song1] = this.list[song2];
             this.list[song2] = mem;
         }
-        this.emit('shuffle');
+        this.emit('songListUpdate');
         return this;
     }
 
@@ -110,7 +199,7 @@ class Player extends Emitter {
         // Change current.
         this.current = this.list[i];
         // load song.
-        this.audio.src = path.join(this.songRoot, this.current);
+        this.audio.src = this.current.url;
         this.audio.load();
         this.emit('songChange', this.old, this.current);
         app.emit('audio', this.audio.src);
@@ -134,31 +223,28 @@ addEventListener('DOMContentLoaded', () => {
         nextButt = document.getElementById('next'),
         prevButt = document.getElementById('prev'),
         currButt = document.getElementById('curr'),
-        songRows = {};
+        moreButt = document.getElementById('more'),
         player = new Player(document.getElementById('audio'));
 
-    player.on('shuffle', updateTable);
-    player.on('ready', updateTable);
+    player.on('songListUpdate', updateTable);
     player.on('timeUpdate', () => win.setProgressBar(player.prog, {
         mode: player.audio.paused ? 'paused' : 'normal'
     }));
     player.on('title', isSong => {
         if (isSong && player.current) {
-            if (player.isOsu) {
-                title.innerHTML = songRows[player.current].childNodes[2].innerText;
+            if (player.current.isOsu) {
+                title.innerHTML = player.current.song;
                 setActivity({
-                    details: songRows[player.current].childNodes[1].innerText,
-                    state: songRows[player.current].childNodes[2].innerText,
-                    largeImageText: 'Mapset ID: ' + songRows[player.current].childNodes[0].innerText,
-                    smallImageText: songRows[player.current].childNodes[3].innerText,
+                    details: player.current.artist,
+                    state: player.current.song,
+                    largeImageText: 'Mapset ID: ' + player.current.id,
+                    smallImageText: player.current.file,
                     partySize:  player.list.indexOf(player.current) + 1 ,
                     partyMax: player.list.length,
                 });
             } else {
-                let help = songRows[player.current].childNodes[0].innerText.split('\\');
-                help = help[help.length - 1];
-                title.innerHTML = help;
-                setActivity({ details: help });
+                title.innerHTML = player.current.file;
+                setActivity({ details: player.current.file });
             }
         } else {
             title.innerHTML = 'osu! music player';
@@ -191,6 +277,7 @@ addEventListener('DOMContentLoaded', () => {
     nextButt.onclick = () => player.next();
     prevButt.onclick = () => player.prev();
     currButt.onclick = scrollToCurrent;
+    moreButt.onclick = () => player.more();
 
     // Menu
     icon.onclick = () => dialog.showMessageBox({
@@ -217,25 +304,24 @@ addEventListener('DOMContentLoaded', () => {
 
     player.on('songChange', (old, current) => {
         if (old) {
-            songRows[old].style.cssText = '';
-            songRows[old].classList.remove('current');
-            songRows[old].classList.remove('expand');
+            old.row.style.cssText = '';
+            old.row.classList.remove('current');
+            old.row.classList.remove('expand');
         }
         if (current) {
-            const currentRow = songRows[current];
-            currentRow.classList.add('current');
+            current.row.classList.add('current');
             currButt.innerHTML =
                 `Track ${ player.list.indexOf(current) + 1 } / ${ player.list.length }`;
             // Change track number & bg image.
-            if (player.isOsu) {
+            if (player.current.isOsu) {
                 const imgUrl = `https://assets.ppy.sh/beatmaps/${
-                    currentRow.childNodes[0].innerText
+                    current.row.childNodes[0].innerText
                 }/covers/cover.jpg`;
 
                 fetch(imgUrl).then(res => {
                     if (res.status == 200) {
-                        currentRow.classList.add('expand');
-                        currentRow.style.cssText =
+                        current.row.classList.add('expand');
+                        current.row.style.cssText =
                             `background-image: url(${ imgUrl });`;
                         scrollToCurrent();
                     }
@@ -323,69 +409,52 @@ addEventListener('DOMContentLoaded', () => {
         // Add songs to the table.
         for (const song of player.list) {
             // Create the td elements.
-            const row = {};
+            const row = {
+                id: document.createElement('td'),
+                artist: document.createElement('td'),
+                song: document.createElement('td'),
+                file: document.createElement('td'),
+            };
 
-            if (player.isOsu) {
-                row.id = document.createElement('td');
-                row.artist = document.createElement('td');
-                row.song = document.createElement('td');
-                row.file = document.createElement('td');
-
-                let help = song.split('');
-                // Extract numbers from the beginning to id td.
-                while(!isNaN(help[1])) row.id.innerText += help.shift();
-                // Remove empty space from the beginning.
-                help[0] = help[0].replace(' ', '').replace('_', '');
-                // Extract filename from the end to file td.
-                help = help.join('').split('\\');
-                row.file.innerText = help.pop();
-                // Extract artist and song name from the rest of the string.
-                // They should be separated by " - ".
-                help = help.join(' ').split(' - ');
-                row.song.innerText = help.pop();
-                row.artist.innerText = help.pop();
-                // Underscore double check.
-                if (row.artist.innerText === 'undefined') {
-                    help = row.song.innerText.split('_-_');
-                    row.song.innerText = help.pop();
-                    row.artist.innerText = help.pop();
-                }
-                row.id.classList.add('numbers');
-            } else {
-                row.file = document.createElement('td');
-                row.file.innerHTML = song;
-            }
-
-            // Add classes.
-            row.file.classList.add('filename');
+            for (var prop in row) row[prop].innerHTML = song[prop];
 
             // Create a table row for the song.
-            const tr = document.createElement('tr');
-            // Clicking the row will play the song.
-            tr.onclick = () => player.playByIndex(player.list.indexOf(song));
+            song.row = document.createElement('tr');
+
+            // Add classes.
+            row.id.classList.add('numbers');
+            row.file.classList.add('filename');
+
+            if (song.isPreview) {
+                song.row.classList.add('preview');
+                row.file.classList.add('dl');
+                row.file.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16">
+                    <path d="M4 8 L4 1 L12 1 L12 8 L16 8 L8 16 L0 8"/>
+                </svg>`;
+
+                // Clicking the row will play the song.
+                row.id.onclick =
+                row.artist.onclick =
+                row.song.onclick = () => player.playByIndex(player.list.indexOf(song));
+                row.file.onclick = () => remote.shell.openExternal(song.file);
+            } else song.row.onclick = () => player.playByIndex(player.list.indexOf(song));
 
             // Add song info to the table row.
-            for (const td in row) tr.appendChild(row[td]);
+            for (const td in row) song.row.appendChild(row[td]);
 
             // Add the table row to the table.
-            newBody.appendChild(tr);
+            newBody.appendChild(song.row);
 
             // Save table row for later use.
-            songRows[song] = tr;
+            // song.row = song.tr;
         }
 
         table.replaceChild(newBody, table.childNodes[0]);
-
-        hideOsuOnlyClass(!player.isOsu);
     }
 
     function scrollToCurrent() {
-        songRows[player.current].scrollIntoView({
+        player.current.row.scrollIntoView({
             behavior: 'smooth', block: 'center'
         });
-    }
-
-    function hideOsuOnlyClass(hide = true) {
-        for (const element of osuOnly) element.hidden = hide;
     }
 })

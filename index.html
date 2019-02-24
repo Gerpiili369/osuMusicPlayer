@@ -3,7 +3,7 @@
     <head>
         <title id="title">osu! music player</title>
         <meta charset="utf-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://assets.ppy.sh https://discordapp.com/api/; img-src 'self' https://assets.ppy.sh; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https://osu.ppy.sh https://assets.ppy.sh https://discordapp.com/api/; media-src 'self' https://b.ppy.sh/preview/; img-src 'self' https://assets.ppy.sh; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com">
         <script src="rpc.js"></script>
         <script src="renderer.js"></script>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Exo+2">
@@ -51,6 +51,7 @@
                 <button type="button" id='prev'>Previous</button>
                 <button type="button" id='next'>Next</button>
                 <button type="button" id='curr'>Track N/A</button>
+                <button type="button" id='more'>More</button>
             </div>
         </div>
     </body>
